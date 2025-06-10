@@ -1,0 +1,267 @@
+# Alerts API Documentation
+
+## Overview
+The Alerts API manages athlete injury alerts and related information. It provides role-based access control for different user types including coaches, managers, parents, athletes, and administrators.
+
+## Base URL
+```
+/api/alerts
+```
+
+## Authentication
+All endpoints require authentication.
+
+## User Roles & Permissions
+- **Coach/Manager**: Can create, update, and delete alerts for athletes in their teams
+- **Parent**: Can view alerts for their children only
+- **Athlete**: Can view their own alerts only
+- **Admin/OrgOwner**: Can view all alerts
+
+## Endpoints
+
+### GET /
+Get all alerts based on user role and permissions.
+
+**Authorization**: Required for all roles
+
+**Response**: 
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "_id": "alert_id",
+      "athlete": {
+        "_id": "athlete_id",
+        "name": "Athlete Name",
+        "team": "team_info"
+      },
+      "severity": "High",
+      "injuryName": "Ankle Sprain",
+      "startDate": "2024-01-15T00:00:00.000Z",
+      "estimatedRecovery": "2024-02-15T00:00:00.000Z",
+      "recoveryProgress": 65,
+      "riskScore": 85,
+      "statusLabel": "Training with Caution",
+      "riskFactors": ["Previous injury", "High workload"],
+      "recommendations": ["Rest", "Physical therapy"],
+      "trendAnalysis": {
+        "workload": [70, 75, 80],
+        "sleep": [7, 6, 8],
+        "fatigue": [3, 4, 2]
+      },
+      "notes": [
+        {
+          "type": "Coach",
+          "author": "coach_id",
+          "content": "Player showing improvement",
+          "date": "2024-01-20T00:00:00.000Z"
+        }
+      ],
+      "createdAt": "2024-01-15T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Filtering Logic**:
+- **Parents**: See alerts for their children only
+- **Coaches/Managers**: See alerts for athletes in their teams
+- **Athletes**: See only their own alerts
+- **Admins**: See all alerts
+
+### POST /
+Create a new alert.
+
+**Authorization**: Coach or Manager only
+
+**Request Body**:
+```json
+{
+  "athlete": "athlete_object_id",
+  "severity": "High",
+  "injuryName": "Ankle Sprain",
+  "startDate": "2024-01-15T00:00:00.000Z",
+  "estimatedRecovery": "2024-02-15T00:00:00.000Z",
+  "recoveryProgress": 0,
+  "riskScore": 85,
+  "statusLabel": "High Risk",
+  "riskFactors": ["Previous injury", "High workload"],
+  "recommendations": ["Complete rest", "Medical evaluation"],
+  "trendAnalysis": {
+    "workload": [85, 90, 95],
+    "sleep": [5, 6, 5],
+    "fatigue": [8, 9, 8]
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+    "_id": "new_alert_id",
+
+  }
+}
+```
+
+**Validation**:
+- Athlete must exist and have role 'athlete'
+- Athlete must belong to the same organization as the requester
+- Only coaches and managers can create alerts
+
+### GET /:id
+Get a specific alert by ID.
+
+**Authorization**: Role-based access (see permissions above)
+
+**Parameters**:
+- `id`: Alert object ID
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+    "_id": "alert_id",
+    "athlete": {
+   
+    },
+    
+  }
+}
+```
+
+**Access Control**:
+- Parents can only view alerts for their children
+- Coaches/Managers can view alerts for athletes in their teams
+- Athletes can only view their own alerts
+- Admins can view any alert
+
+### PATCH /:id
+Update an existing alert.
+
+**Authorization**: Coach or Manager only
+
+**Parameters**:
+- `id`: Alert object ID
+
+**Request Body**: Any fields from the alert schema that need to be updated
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+   
+  }
+}
+```
+
+**Validation**:
+- Alert must exist
+- Athlete must belong to the same organization as the requester
+- Only coaches and managers can update alerts
+
+### DELETE /:id
+Delete an alert.
+
+**Authorization**: Coach or Manager only
+
+**Parameters**:
+- `id`: Alert object ID
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": null
+}
+```
+
+**Status Code**: 204 (No Content)
+
+**Validation**:
+- Alert must exist
+- Athlete must belong to the same organization as the requester
+- Only coaches and managers can delete alerts
+
+## Data Schema
+
+### Alert Object
+```json
+{
+  "_id": "ObjectId",
+  "athlete": "ObjectId (ref: User)",
+  "severity": "Low | Medium | High",
+  "injuryName": "String (required)",
+  "startDate": "Date (required)",
+  "estimatedRecovery": "Date",
+  "recoveryProgress": "Number (0-100)",
+  "riskScore": "Number (0-100, required)",
+  "statusLabel": "Normal Training | Minor | Training with Caution | Moderate | High Risk",
+  "riskFactors": ["String"],
+  "recommendations": ["String"],
+  "trendAnalysis": {
+    "workload": ["Number"],
+    "sleep": ["Number"],
+    "fatigue": ["Number"]
+  },
+  "notes": [
+    {
+      "type": "Physician | Coach | Parent",
+      "author": "ObjectId (ref: User)",
+      "content": "String",
+      "date": "Date (default: now)"
+    }
+  ],
+  "createdAt": "Date (default: now)"
+}
+```
+
+## Error Responses
+
+### 400 Bad Request
+```json
+{
+  "message": "Error description"
+}
+```
+
+### 401 Unauthorized
+```json
+{
+  "message": "Authentication required"
+}
+```
+
+### 403 Forbidden
+```json
+{
+  "message": "Not authorized to perform this action"
+}
+```
+
+### 404 Not Found
+```json
+{
+  "message": "Alert not found"
+}
+```
+
+## Status Codes
+- `200`: Success (GET, PATCH)
+- `201`: Created (POST)
+- `204`: No Content (DELETE)
+- `400`: Bad Request
+- `401`: Unauthorized
+- `403`: Forbidden
+- `404`: Not Found
+
+## Notes
+- All dates should be in ISO 8601 format
+- Organization-level access control ensures users can only manage alerts within their organization
+- Recovery progress and risk scores are percentages (0-100)
+- Trend analysis arrays can contain multiple data points for tracking over time
