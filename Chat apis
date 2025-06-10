@@ -1,0 +1,267 @@
+# Chat/Messaging API Documentation
+
+## Overview
+The Chat/Messaging API enables real-time communication between users within teams. It includes features for sending messages, retrieving chat history, and real-time notifications via Pusher. The system enforces team-based messaging restrictions and automatically creates chat rooms between participants.
+
+## Base URL
+```
+/api/chats
+```
+
+## Authentication
+All endpoints require authentication. Include the authorization token in your request headers.
+
+## Real-time Features
+- **Pusher Integration**: Real-time message delivery using WebSocket connections
+- **Private Channels**: Each chat has a unique private channel for secure communication
+- **Automatic Chat Creation**: Chat rooms are created automatically when users first message each other
+
+## Endpoints
+
+### POST /send-message
+Send a message to another user.
+
+**Authorization**: All authenticated users
+
+**Request Body**:
+```json
+{
+  "receiverId": "user_object_id",
+  "message": "Hello! How are you doing?"
+}
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+    "_id": "message_object_id",
+    "chat": "chat_object_id",
+    "sender": "sender_user_id",
+    "receiver": "receiver_user_id",
+    "message": "Hello! How are you doing?",
+    "read": false,
+    "createdAt": "2024-01-15T10:00:00.000Z",
+    "updatedAt": "2024-01-15T10:00:00.000Z"
+  },
+  "channel": "private-chat-user1id-user2id"
+}
+```
+
+**Status Code**: 201 Created
+
+**Validation Rules**:
+- Users cannot send messages to themselves
+- Users can only message team members (must share at least one team)
+- Both `receiverId` and `message` are required fields
+
+**Real-time Event**:
+When a message is sent, a real-time event is triggered on the private channel:
+```json
+{
+  "event": "new-message",
+  "data": {
+    "id": "message_object_id",
+    "message": "Hello! How are you doing?",
+    "sender": "sender_user_id",
+    "receiver": "receiver_user_id",
+    "timestamp": "2024-01-15T10:00:00.000Z"
+  }
+}
+```
+
+**Error Responses**:
+- `400`: "You cannot send messages to yourself"
+- `400`: "You can only send messages to your team members"
+- `400`: "receiverId and message are required"
+
+### GET /get-messages/:userId1/:userId2
+Retrieve chat history between two users.
+
+**Authorization**: All authenticated users
+
+**Parameters**:
+- `userId1`: First user's object ID
+- `userId2`: Second user's object ID
+
+**Example Request**:
+```
+GET /api/chats/get-messages/683d43da723af0fb035a6457/68382633976320cfd5fb2504
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+    "chat": {
+      "_id": "chat_object_id",
+      "participants": [
+        "683d43da723af0fb035a6457",
+        "68382633976320cfd5fb2504"
+      ],
+      "createdAt": "2024-01-15T09:00:00.000Z",
+      "updatedAt": "2024-01-15T10:00:00.000Z"
+    },
+    "messages": [
+      {
+        "_id": "message1_id",
+        "chat": "chat_object_id",
+        "sender": "683d43da723af0fb035a6457",
+        "receiver": "68382633976320cfd5fb2504",
+        "message": "Hello!",
+        "read": false,
+        "createdAt": "2024-01-15T09:30:00.000Z",
+        "updatedAt": "2024-01-15T09:30:00.000Z"
+      },
+      {
+        "_id": "message2_id",
+        "chat": "chat_object_id",
+        "sender": "68382633976320cfd5fb2504",
+        "receiver": "683d43da723af0fb035a6457",
+        "message": "Hi there! How are you?",
+        "read": false,
+        "createdAt": "2024-01-15T09:35:00.000Z",
+        "updatedAt": "2024-01-15T09:35:00.000Z"
+      }
+    ],
+    "channel": "private-chat-683d43da723af0fb035a6457-68382633976320cfd5fb2504"
+  }
+}
+```
+
+**Features**:
+- **Auto-creates chat**: If no chat exists between the users, it creates one automatically
+- **Sorted messages**: Messages are returned in chronological order (oldest first)
+- **Channel information**: Returns the Pusher channel name for real-time updates
+
+## Data Schema
+
+### Message Object
+```json
+{
+  "_id": "ObjectId",
+  "chat": "ObjectId (ref: Chat, required)",
+  "sender": "ObjectId (ref: User, required)",
+  "receiver": "ObjectId (ref: User, required)",
+  "message": "String (required, trimmed)",
+  "read": "Boolean (default: false)",
+  "createdAt": "Date (auto-generated)",
+  "updatedAt": "Date (auto-generated)"
+}
+```
+
+### Chat Object
+```json
+{
+  "_id": "ObjectId",
+  "participants": [
+    "ObjectId (ref: User, required)"
+  ],
+  "createdAt": "Date (auto-generated)",
+  "updatedAt": "Date (auto-generated)"
+}
+```
+
+## Real-time Integration
+
+### Pusher Channel Naming
+Private channels are created using a consistent naming convention:
+```
+private-chat-{userId1}-{userId2}
+```
+Where user IDs are sorted alphabetically to ensure the same channel name regardless of who initiates the chat.
+
+### Example Channel Names
+- Users: `683d43da723af0fb035a6457` and `68382633976320cfd5fb2504`
+- Channel: `private-chat-683d43da723af0fb035a6457-68382633976320cfd5fb2504`
+
+### Client-side Integration
+To listen for real-time messages, subscribe to the private channel:
+
+```javascript
+// Example with Pusher JavaScript client
+const pusher = new Pusher('your-app-key', {
+  cluster: 'your-cluster'
+});
+
+const channel = pusher.subscribe('private-chat-user1id-user2id');
+channel.bind('new-message', function(data) {
+  console.log('New message received:', data);
+  // Update your UI with the new message
+});
+```
+
+## Team-based Messaging
+- Users can only send messages to members of their teams
+- The system checks if sender and receiver share at least one team
+- Team validation is performed on every message send
+
+## Auto Chat Creation
+- Chat rooms are automatically created when:
+  - Users send their first message to each other
+  - Retrieving message history for users who haven't chatted before
+- Each chat has exactly 2 participants
+- Participants array is always sorted for consistency
+
+## Error Responses
+
+### 400 Bad Request
+```json
+{
+  "message": "You cannot send messages to yourself"
+}
+```
+
+```json
+{
+  "message": "You can only send messages to your team members"
+}
+```
+
+```json
+{
+  "message": "receiverId and message are required"
+}
+```
+
+### 500 Internal Server Error
+```json
+{
+  "message": "Failed to send message",
+  "error": "Detailed error description"
+}
+```
+
+```json
+{
+  "message": "Failed to get or create chat/messages",
+  "error": "Detailed error description"
+}
+```
+
+## Status Codes
+- `200`: Success (GET requests)
+- `201`: Created (POST /send-message)
+- `400`: Bad Request (validation errors)
+- `401`: Unauthorized
+- `500`: Internal Server Error
+
+## Message Status
+- **Read Status**: Messages have a `read` field (default: false)
+- **Timestamps**: All messages include `createdAt` and `updatedAt` timestamps
+- **Message Trimming**: Message content is automatically trimmed of whitespace
+
+## Security Features
+- **Authentication Required**: All endpoints require valid authentication
+- **Team-based Access Control**: Users can only message team members
+- **Private Channels**: Real-time communication uses private Pusher channels
+- **Input Validation**: Message content and receiver validation
+
+## Notes
+- Messages are stored permanently in the database
+- Chat history is retrieved in chronological order
+- The system supports unlimited message history
+- Real-time events are triggered immediately after successful message creation
+- User IDs in URLs must be valid MongoDB ObjectIds
