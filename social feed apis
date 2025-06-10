@@ -1,0 +1,369 @@
+# Social Feed API Documentation
+
+## Overview
+The Social Feed API manages team posts with features like creating, reading, updating, deleting posts, as well as social interactions such as likes and comments. It includes role-based access control and media upload functionality.
+
+## Base URL
+```
+/api/posts
+```
+
+## Authentication
+All endpoints require authentication. Include the authorization token in your request headers.
+
+## User Roles & Permissions
+- **Coach/Parents**: Can create, update, and delete posts
+- **All Authenticated Users**: Can view posts, like/unlike posts, add/delete comments
+
+## Endpoints
+
+### POST /create
+Create a new post with optional media upload.
+
+**Authorization**: Coach or Parents only
+
+**Content-Type**: `multipart/form-data`
+
+**Request Body**:
+```json
+{
+  "title": "Team Training Update",
+  "description": "Great practice session today! The team showed excellent improvement.",
+  "team": "team_object_id",
+  "user": "user_object_id",
+  "media": "file_upload" // Optional media file
+}
+```
+
+**Response**:
+```json
+{
+  "_id": "post_object_id",
+  "title": "Team Training Update",
+  "description": "Great practice session today! The team showed excellent improvement.",
+  "media": "https://s3-bucket-url/media-file.jpg",
+  "team": "team_object_id",
+  "user": "user_object_id",
+  "likes": [],
+  "comments": [],
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z"
+}
+```
+
+**Status Code**: 201 Created
+
+### GET /
+Get all posts for the user's team with pagination.
+
+**Authorization**: All authenticated users
+
+**Query Parameters**:
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Number of posts per page (default: 5)
+
+**Example Request**:
+```
+GET /api/posts?page=2&limit=10
+```
+
+**Response**:
+```json
+[
+  {
+    "_id": "post_object_id",
+    "title": "Team Training Update",
+    "description": "Great practice session today!",
+    "media": "https://s3-bucket-url/media-file.jpg",
+    "team": "team_object_id",
+    "user": "user_object_id",
+    "likes": ["user_id_1", "user_id_2"],
+    "comments": [
+      {
+        "_id": "comment_id",
+        "text": "Great job team!",
+        "user": "user_object_id",
+        "createdAt": "2024-01-15T11:00:00.000Z"
+      }
+    ],
+    "createdAt": "2024-01-15T10:00:00.000Z",
+    "updatedAt": "2024-01-15T10:00:00.000Z"
+  }
+]
+```
+
+**Note**: Posts are filtered by the user's team and sorted by creation date (newest first).
+
+### GET /:id
+Get a specific post by ID.
+
+**Authorization**: All authenticated users
+
+**Parameters**:
+- `id`: Post object ID
+
+**Response**:
+```json
+{
+  "_id": "post_object_id",
+  "title": "Team Training Update",
+  "description": "Great practice session today!",
+  "media": "https://s3-bucket-url/media-file.jpg",
+  "team": "team_object_id",
+  "user": "user_object_id",
+  "likes": ["user_id_1", "user_id_2"],
+  "comments": [
+    {
+      "_id": "comment_id",
+      "text": "Great job team!",
+      "user": "user_object_id",
+      "createdAt": "2024-01-15T11:00:00.000Z"
+    }
+  ],
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T10:00:00.000Z"
+}
+```
+
+### PUT /:id
+Update an existing post.
+
+**Authorization**: Coach or Parents only
+
+**Content-Type**: `multipart/form-data`
+
+**Parameters**:
+- `id`: Post object ID
+
+**Request Body**:
+```json
+{
+  "title": "Updated Team Training",
+  "description": "Updated description",
+  "team": "team_object_id",
+  "user": "user_object_id",
+  "media": "new_file_upload" 
+}
+```
+
+**Response**:
+```json
+{
+  "_id": "post_object_id",
+  "title": "Updated Team Training",
+  "description": "Updated description",
+  "media": "https://s3-bucket-url/new-media-file.jpg",
+  "team": "team_object_id",
+  "user": "user_object_id",
+  "likes": ["user_id_1"],
+  "comments": [],
+  "createdAt": "2024-01-15T10:00:00.000Z",
+  "updatedAt": "2024-01-15T12:00:00.000Z"
+}
+```
+
+### DELETE /:id
+Delete a post.
+
+**Authorization**: Coach or Parents only
+
+**Parameters**:
+- `id`: Post object ID
+
+**Response**:
+```json
+{
+  "_id": "deleted_post_id",
+  "title": "Deleted Post Title",
+  // ... deleted post data
+}
+```
+
+## Social Interaction Endpoints
+
+### POST /:id/like
+Like a post.
+
+**Authorization**: All authenticated users
+
+**Parameters**:
+- `id`: Post object ID
+
+**Response**:
+```json
+{
+  "_id": "post_object_id",
+  "likes": ["user_id_1", "current_user_id"],
+  // ... rest of post data
+}
+```
+
+**Error Responses**:
+- `400`: "You already liked this post"
+- `404`: "Post not found"
+
+### POST /:id/unlike
+Unlike a post.
+
+**Authorization**: All authenticated users
+
+**Parameters**:
+- `id`: Post object ID
+
+**Response**:
+```json
+{
+  "_id": "post_object_id",
+  "likes": ["user_id_1"], // current user removed
+  // ... rest of post data
+}
+```
+
+**Error Responses**:
+- `400`: "You have not liked this post"
+- `404`: "Post not found"
+
+### POST /:id/comment
+Add a comment to a post.
+
+**Authorization**: All authenticated users
+
+**Parameters**:
+- `id`: Post object ID
+
+**Request Body**:
+```json
+{
+  "text": "Great post! Thanks for sharing."
+}
+```
+
+**Response**:
+```json
+{
+  "_id": "post_object_id",
+  "comments": [
+    {
+      "_id": "new_comment_id",
+      "text": "Great post! Thanks for sharing.",
+      "user": "current_user_id",
+      "createdAt": "2024-01-15T13:00:00.000Z"
+    }
+  ],
+  // ... rest of post data
+}
+```
+
+### DELETE /:id/comment/:commentId
+Delete a comment from a post.
+
+**Authorization**: All authenticated users
+
+**Parameters**:
+- `id`: Post object ID
+- `commentId`: Comment object ID
+
+**Response**:
+```json
+{
+  "_id": "post_object_id",
+  "comments": [], // comment removed
+  // ... rest of post data
+}
+```
+
+## Data Schema
+
+### Post Object
+```json
+{
+  "_id": "ObjectId",
+  "title": "String",
+  "description": "String",
+  "media": "String (URL)",
+  "team": "ObjectId (ref: Team, required)",
+  "user": "ObjectId (ref: User, required)",
+  "likes": ["ObjectId (ref: User)"],
+  "comments": [
+    {
+      "_id": "ObjectId",
+      "text": "String",
+      "user": "ObjectId (ref: User)",
+      "createdAt": "Date (default: now)"
+    }
+  ],
+  "createdAt": "Date (auto-generated)",
+  "updatedAt": "Date (auto-generated)"
+}
+```
+
+### Comment Object
+```json
+{
+  "_id": "ObjectId",
+  "text": "String",
+  "user": "ObjectId (ref: User)",
+  "createdAt": "Date (default: now)"
+}
+```
+
+## File Upload
+- **Endpoint**: POST `/create` and PUT `/:id`
+- **Field Name**: `media`
+- **Supported Types**: Images, videos (configured in upload controller)
+- **Storage**: AWS S3 (based on `req.file.location` usage)
+
+## Error Responses
+
+### 400 Bad Request
+```json
+{
+  "message": "You already liked this post"
+}
+```
+
+### 401 Unauthorized
+```json
+{
+  "message": "Authentication required"
+}
+```
+
+### 403 Forbidden
+```json
+{
+  "message": "Access denied"
+}
+```
+
+### 404 Not Found
+```json
+{
+  "message": "Post not found"
+}
+```
+
+### 500 Internal Server Error
+```json
+{
+  "message": "Error description"
+}
+```
+
+## Status Codes
+- `200`: Success (GET, PUT, POST for likes/comments, DELETE)
+- `201`: Created (POST /create)
+- `400`: Bad Request (validation errors, duplicate likes)
+- `401`: Unauthorized
+- `403`: Forbidden
+- `404`: Not Found
+- `500`: Internal Server Error
+
+## Pagination
+The `GET /` endpoint supports pagination:
+- **Default page size**: 5 posts
+- **Query parameters**: `page` and `limit`
+- **Sort order**: Newest posts first (`createdAt: -1`)
+
+## Team-Based Filtering
+Posts are automatically filtered by the authenticated user's team. Users can only see posts from their own team.
